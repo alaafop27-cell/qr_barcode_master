@@ -15,9 +15,6 @@ dependencies:
   qr_flutter: ^4.1.0
   image_picker: ^1.1.2        # scan from gallery image
 
-  # Ads (inactive until you provide your IDs - see lib/core/ads/ad_config.dart)
-  google_mobile_ads: ^5.2.0
-
   # Sharing / files / launching
   share_plus: ^10.1.2
   path_provider: ^2.1.5
