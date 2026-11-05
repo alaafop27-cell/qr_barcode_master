@@ -4,6 +4,7 @@
  * adds CAMERA / VIBRATE / INTERNET permissions
  * sets the app label to "QR & Barcode Master"
  * raises minSdk to 23 (required by mobile_scanner / ML Kit)
+ * upgrades Kotlin / Android Gradle Plugin / Gradle versions
  * inserts the AdMob APPLICATION_ID meta-data ONLY if env ADMOB_APP_ID is set
 """
 import glob
@@ -12,6 +13,10 @@ import re
 import sys
 
 MANIFEST = "android/app/src/main/AndroidManifest.xml"
+
+KOTLIN_VERSION = "2.1.0"
+AGP_VERSION = "8.7.3"
+GRADLE_VERSION = "8.9"
 
 
 def patch_manifest() -> None:
@@ -68,6 +73,40 @@ def patch_min_sdk() -> None:
         print(f"minSdk set to 23 in {path}")
 
 
+def patch_gradle_versions() -> None:
+    # Kotlin + Android Gradle Plugin versions live in settings.gradle(.kts)
+    settings = glob.glob("android/settings.gradle.kts") + glob.glob("android/settings.gradle")
+    if not settings:
+        sys.exit("No android/settings.gradle(.kts) found")
+    path = settings[0]
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+
+    text, n1 = re.subn(
+        r'''(org\.jetbrains\.kotlin\.android["']\s*\)?\s*version\s*["'])[^"']+''',
+        r"\g<1>" + KOTLIN_VERSION,
+        text,
+    )
+    text, n2 = re.subn(
+        r'''(com\.android\.application["']\s*\)?\s*version\s*["'])[^"']+''',
+        r"\g<1>" + AGP_VERSION,
+        text,
+    )
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+    print(f"{path}: kotlin updated={n1 > 0}, AGP updated={n2 > 0}")
+
+    # Gradle wrapper
+    wrapper = "android/gradle/wrapper/gradle-wrapper.properties"
+    with open(wrapper, encoding="utf-8") as f:
+        props = f.read()
+    props, n3 = re.subn(r"gradle-[0-9.]+-(all|bin)\.zip", f"gradle-{GRADLE_VERSION}-all.zip", props)
+    with open(wrapper, "w", encoding="utf-8") as f:
+        f.write(props)
+    print(f"Gradle wrapper updated={n3 > 0}")
+
+
 if __name__ == "__main__":
     patch_manifest()
     patch_min_sdk()
+    patch_gradle_versions()
