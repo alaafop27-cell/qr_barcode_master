@@ -1,0 +1,39 @@
+name: qr_barcode_master
+description: QR & Barcode Master - fast local QR/barcode scanner and generator.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Scanning / generating
+  mobile_scanner: ^6.0.2
+  qr_flutter: ^4.1.0
+  image_picker: ^1.1.2        # scan from gallery image
+
+  # Ads (inactive until you provide your IDs - see lib/core/ads/ad_config.dart)
+  google_mobile_ads: ^5.2.0
+
+  # Sharing / files / launching
+  share_plus: ^10.1.2
+  path_provider: ^2.1.5
+  url_launcher: ^6.3.1
+
+  # Local storage + state
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  provider: ^6.1.2
+
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
