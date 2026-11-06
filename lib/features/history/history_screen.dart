@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/l10n/app_strings.dart';
 import '../../core/models/scan_record.dart';
 import '../../core/services/history_repository.dart';
 import '../../core/utils/code_parser.dart';
@@ -33,19 +33,27 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return r.rawValue.toLowerCase().contains(_query.toLowerCase());
   }
 
+  String _filterLabel(_Filter f) => context.tr(switch (f) {
+        _Filter.all => 'All',
+        _Filter.scanned => 'Scanned',
+        _Filter.generated => 'Generated',
+        _Filter.favorites => 'Favorites',
+      });
+
   Future<void> _confirmClear(HistoryRepository repo) async {
     final yes = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Clear history?'),
-        content: const Text('All saved scans and generated codes will be deleted.'),
+        title: Text(ctx.tr('Clear history?')),
+        content:
+            Text(ctx.tr('All saved scans and generated codes will be deleted.')),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
+              child: Text(ctx.tr('Cancel'))),
           FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Clear')),
+              child: Text(ctx.tr('Clear'))),
         ],
       ),
     );
@@ -59,11 +67,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('History'),
+        title: Text(context.tr('History')),
         actions: [
           if (repo.items.isNotEmpty)
             IconButton(
-              tooltip: 'Clear all',
+              tooltip: context.tr('Clear all'),
               icon: const Icon(Icons.delete_sweep_outlined),
               onPressed: () => _confirmClear(repo),
             ),
@@ -74,7 +82,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: SearchBar(
-              hintText: 'Search',
+              hintText: context.tr('Search'),
               leading: const Icon(Icons.search),
               elevation: const WidgetStatePropertyAll(0),
               onChanged: (v) => setState(() => _query = v.trim()),
@@ -87,12 +95,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               children: [
                 for (final f in _Filter.values) ...[
                   ChoiceChip(
-                    label: Text(switch (f) {
-                      _Filter.all => 'All',
-                      _Filter.scanned => 'Scanned',
-                      _Filter.generated => 'Generated',
-                      _Filter.favorites => 'Favorites',
-                    }),
+                    label: Text(_filterLabel(f)),
                     selected: _filter == f,
                     onSelected: (_) => setState(() => _filter = f),
                   ),
@@ -103,7 +106,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
           Expanded(
             child: items.isEmpty
-                ? const Center(child: Text('Nothing here yet'))
+                ? Center(child: Text(context.tr('Nothing here yet')))
                 : ListView.separated(
                     itemCount: items.length,
                     separatorBuilder: (_, __) => const Divider(height: 1),
@@ -116,24 +119,29 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Widget _tile(BuildContext context, HistoryRepository repo, ScanRecord r) {
-    final parsed = CodeParser.parse(r.rawValue, format: r.format);
+    final parsed =
+        CodeParser.parse(r.rawValue, format: r.format, tr: context.tr);
     final cs = Theme.of(context).colorScheme;
+    final kind = context
+        .tr(r.source == ScanSource.generated ? 'Generated' : 'Scanned');
 
     return Dismissible(
       key: ValueKey(r.id),
       direction: DismissDirection.endToStart,
       background: Container(
         color: cs.errorContainer,
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 24),
+        alignment: AlignmentDirectional.centerEnd,
+        padding: const EdgeInsetsDirectional.only(end: 24),
         child: Icon(Icons.delete, color: cs.onErrorContainer),
       ),
       onDismissed: (_) {
+        final deleted = context.tr('Deleted');
+        final undo = context.tr('Undo');
         repo.delete(r.id);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Deleted'),
-            action: SnackBarAction(label: 'Undo', onPressed: () => repo.add(r)),
+            content: Text(deleted),
+            action: SnackBarAction(label: undo, onPressed: () => repo.add(r)),
           ),
         );
       },
@@ -144,9 +152,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ),
         title: Text(parsed.title, maxLines: 1, overflow: TextOverflow.ellipsis),
         subtitle: Text(
-          '${parsed.type.label}  •  ${prettyFormat(r.format)}  •  '
-          '${r.source == ScanSource.generated ? 'Generated' : 'Scanned'}\n'
-          '${DateFormat.yMMMd().add_Hm().format(r.createdAt)}',
+          '${context.tr(parsed.type.label)}  •  '
+          '${context.tr(prettyFormat(r.format))}  •  $kind\n'
+          '${context.strings.dateTime(r.createdAt)}',
         ),
         isThreeLine: true,
         trailing: IconButton(

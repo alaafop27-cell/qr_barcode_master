@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/ads/banner_ad_widget.dart';
+import '../../core/l10n/app_strings.dart';
 import '../../core/models/scan_record.dart';
+import '../../core/utils/barcode_encoder.dart';
 import '../../core/utils/code_parser.dart';
+import '../../core/widgets/barcode_view.dart';
 
 /// Shows the decoded content of a scanned / generated code and the
 /// relevant actions (open link, call, copy Wi-Fi password, ...).
@@ -17,9 +19,11 @@ class ResultScreen extends StatelessWidget {
 
   Future<void> _run(BuildContext context, CodeAction action) async {
     final messenger = ScaffoldMessenger.of(context);
+    final copied = context.tr('Copied');
+    final noApp = context.tr('No app found to open this');
     if (action.copyText != null) {
       await Clipboard.setData(ClipboardData(text: action.copyText!));
-      messenger.showSnackBar(const SnackBar(content: Text('Copied')));
+      messenger.showSnackBar(SnackBar(content: Text(copied)));
       return;
     }
     final uri = action.uri;
@@ -29,20 +33,22 @@ class ResultScreen extends StatelessWidget {
       ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (_) {}
     if (!ok) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('No app found to open this')),
-      );
+      messenger.showSnackBar(SnackBar(content: Text(noApp)));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final parsed = CodeParser.parse(record.rawValue, format: record.format);
+    final parsed =
+        CodeParser.parse(record.rawValue, format: record.format, tr: context.tr);
     final cs = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
+    final kind = BarcodeEncoder.kindFromFormat(record.format);
+    final barcode =
+        kind == null ? null : BarcodeEncoder.tryEncode(kind, record.rawValue);
 
     return Scaffold(
-      appBar: AppBar(title: Text(parsed.type.label)),
+      appBar: AppBar(title: Text(context.tr(parsed.type.label))),
       bottomNavigationBar: const SafeArea(child: BannerAdWidget()),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -73,8 +79,8 @@ class ResultScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${prettyFormat(record.format)}  •  '
-                          '${DateFormat.yMMMd().add_Hm().format(record.createdAt)}',
+                          '${context.tr(prettyFormat(record.format))}  •  '
+                          '${context.strings.dateTime(record.createdAt)}',
                           style: text.bodySmall
                               ?.copyWith(color: cs.onPrimaryContainer),
                         ),
@@ -121,16 +127,17 @@ class ResultScreen extends StatelessWidget {
               FilledButton.tonalIcon(
                 onPressed: () => Share.share(record.rawValue),
                 icon: const Icon(Icons.share),
-                label: const Text('Share'),
+                label: Text(context.tr('Share')),
               ),
               if (parsed.actions.every((a) => a.copyText == null))
                 FilledButton.tonalIcon(
                   onPressed: () => _run(
                     context,
-                    CodeAction('Copy', Icons.copy, copyText: record.rawValue),
+                    CodeAction(context.tr('Copy'), Icons.copy,
+                        copyText: record.rawValue),
                   ),
                   icon: const Icon(Icons.copy),
-                  label: const Text('Copy'),
+                  label: Text(context.tr('Copy')),
                 ),
             ],
           ),
@@ -143,7 +150,7 @@ class ResultScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Raw content',
+                  Text(context.tr('Raw content'),
                       style: text.labelMedium?.copyWith(color: cs.primary)),
                   const SizedBox(height: 4),
                   SelectableText(record.rawValue),
@@ -152,8 +159,19 @@ class ResultScreen extends StatelessWidget {
             ),
           ),
 
-          // QR preview (skipped for very long payloads)
-          if (record.rawValue.length <= 1000) ...[
+          // Visual preview: the real barcode for Code 128 / EAN codes,
+          // a QR image for QR codes (skipped for very long payloads).
+          if (barcode != null) ...[
+            const SizedBox(height: 12),
+            Center(
+              child: Container(
+                color: Colors.white,
+                padding: const EdgeInsets.all(12),
+                child: BarcodeView(code: barcode),
+              ),
+            ),
+          ] else if (record.format == 'qrCode' &&
+              record.rawValue.length <= 1000) ...[
             const SizedBox(height: 12),
             Center(
               child: Container(
@@ -163,10 +181,10 @@ class ResultScreen extends StatelessWidget {
                   data: record.rawValue,
                   size: 180,
                   backgroundColor: Colors.white,
-                  errorStateBuilder: (_, __) => const SizedBox(
+                  errorStateBuilder: (_, __) => SizedBox(
                     width: 180,
                     height: 180,
-                    child: Center(child: Text('Cannot render QR')),
+                    child: Center(child: Text(context.tr('Cannot render QR'))),
                   ),
                 ),
               ),

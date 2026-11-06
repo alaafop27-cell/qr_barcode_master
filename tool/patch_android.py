@@ -5,6 +5,7 @@
  * sets the app label to "QR & Barcode Master"
  * raises minSdk to 23 (required by mobile_scanner / ML Kit)
  * upgrades Kotlin / Android Gradle Plugin / Gradle versions
+ * writes the custom launcher icon (tool/make_icons.py)
  * inserts the AdMob APPLICATION_ID meta-data ONLY if env ADMOB_APP_ID is set
 """
 import glob
@@ -36,7 +37,8 @@ def patch_manifest() -> None:
     if additions:
         xml = xml.replace("<application", additions + "    <application", 1)
 
-    xml = re.sub(r'android:label="[^"]*"', 'android:label="QR &amp; Barcode Master"', xml, count=1)
+    # App name comes from res/values*/strings.xml (English + Arabic).
+    xml = re.sub(r'android:label="[^"]*"', 'android:label="@string/app_name"', xml, count=1)
 
     app_id = os.environ.get("ADMOB_APP_ID", "").strip()
     if app_id and "com.google.android.gms.ads.APPLICATION_ID" not in xml:
@@ -106,7 +108,33 @@ def patch_gradle_versions() -> None:
     print(f"Gradle wrapper updated={n3 > 0}")
 
 
+def write_app_names() -> None:
+    """Localised launcher name: English by default, Arabic on Arabic devices."""
+    names = {
+        "values": "QR &amp; Barcode Master",
+        "values-ar": "ماسح QR والباركود",
+    }
+    for folder, name in names.items():
+        directory = os.path.join("android", "app", "src", "main", "res", folder)
+        os.makedirs(directory, exist_ok=True)
+        with open(os.path.join(directory, "strings.xml"), "w", encoding="utf-8") as f:
+            f.write(
+                '<?xml version="1.0" encoding="utf-8"?>\n'
+                f'<resources>\n    <string name="app_name">{name}</string>\n</resources>\n'
+            )
+    print("Localised app names written (en, ar).")
+
+
+def patch_icons() -> None:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import make_icons
+
+    make_icons.write_icons(os.path.join("android", "app", "src", "main", "res"))
+
+
 if __name__ == "__main__":
     patch_manifest()
     patch_min_sdk()
     patch_gradle_versions()
+    write_app_names()
+    patch_icons()

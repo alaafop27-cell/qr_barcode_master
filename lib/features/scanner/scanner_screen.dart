@@ -4,6 +4,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/ads/ad_service.dart';
+import '../../core/l10n/app_strings.dart';
 import '../../core/models/scan_record.dart';
 import '../../core/services/feedback_service.dart';
 import '../../core/services/history_repository.dart';
@@ -12,7 +13,9 @@ import '../result/result_screen.dart';
 
 /// Real-time scanner for QR codes and all common barcode formats.
 class ScannerScreen extends StatefulWidget {
-  const ScannerScreen({super.key});
+  /// When true, the gallery picker opens right away (used by "From image").
+  final bool autoPickImage;
+  const ScannerScreen({super.key, this.autoPickImage = false});
 
   @override
   State<ScannerScreen> createState() => _ScannerScreenState();
@@ -36,6 +39,11 @@ class _ScannerScreenState extends State<ScannerScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    if (widget.autoPickImage) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _pickFromGallery();
+      });
+    }
   }
 
   @override
@@ -89,6 +97,7 @@ class _ScannerScreenState extends State<ScannerScreen>
 
   Future<void> _pickFromGallery() async {
     final messenger = ScaffoldMessenger.of(context);
+    final notFound = context.tr('No QR code or barcode found in that image');
     final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (picked == null) return;
     BarcodeCapture? capture;
@@ -98,9 +107,7 @@ class _ScannerScreenState extends State<ScannerScreen>
     Barcode? hit;
     _firstValue(capture, onHit: (b) => hit = b);
     if (hit == null) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('No QR code or barcode found in that image')),
-      );
+      messenger.showSnackBar(SnackBar(content: Text(notFound)));
       return;
     }
     if (_busy) return;
@@ -178,9 +185,9 @@ class _ScannerScreenState extends State<ScannerScreen>
       child: Row(
         children: [
           const SizedBox(width: 8),
-          const Text(
-            'Scan',
-            style: TextStyle(
+          Text(
+            context.tr('Scan'),
+            style: const TextStyle(
                 color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600),
           ),
           const Spacer(),
@@ -189,7 +196,7 @@ class _ScannerScreenState extends State<ScannerScreen>
             builder: (context, state, _) {
               final on = state.torchState == TorchState.on;
               return IconButton(
-                tooltip: 'Flashlight',
+                tooltip: context.tr('Flashlight'),
                 color: Colors.white,
                 icon: Icon(on ? Icons.flash_on : Icons.flash_off),
                 onPressed: state.torchState == TorchState.unavailable
@@ -199,13 +206,13 @@ class _ScannerScreenState extends State<ScannerScreen>
             },
           ),
           IconButton(
-            tooltip: 'Scan from image',
+            tooltip: context.tr('Scan from image'),
             color: Colors.white,
             icon: const Icon(Icons.photo_library_outlined),
             onPressed: _pickFromGallery,
           ),
           IconButton(
-            tooltip: 'Switch camera',
+            tooltip: context.tr('Switch camera'),
             color: Colors.white,
             icon: const Icon(Icons.cameraswitch_outlined),
             onPressed: () => _safe(_controller.switchCamera),
@@ -254,9 +261,9 @@ class _CameraError extends StatelessWidget {
           const Icon(Icons.no_photography, color: Colors.white70, size: 64),
           const SizedBox(height: 16),
           Text(
-            denied
-                ? 'Camera permission is required to scan.\nEnable it in Android Settings > Apps > QR & Barcode Master > Permissions.'
-                : 'The camera is not available.',
+            context.tr(denied
+                ? 'Camera permission is required to scan. Enable it in the phone Settings under Apps > Permissions.'
+                : 'The camera is not available.'),
             textAlign: TextAlign.center,
             style: const TextStyle(color: Colors.white70, fontSize: 16),
           ),

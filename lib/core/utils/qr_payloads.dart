@@ -14,6 +14,25 @@ class QrPayloads {
 
   static String phone(String v) => 'tel:${v.trim().replaceAll(' ', '')}';
 
+  static String email({
+    required String address,
+    String subject = '',
+    String body = '',
+  }) {
+    final query = [
+      if (subject.trim().isNotEmpty)
+        'subject=${Uri.encodeComponent(subject.trim())}',
+      if (body.trim().isNotEmpty) 'body=${Uri.encodeComponent(body.trim())}',
+    ].join('&');
+    return 'mailto:${address.trim()}${query.isEmpty ? '' : '?$query'}';
+  }
+
+  static String sms({required String number, String message = ''}) =>
+      'SMSTO:${number.trim().replaceAll(' ', '')}:${message.trim()}';
+
+  static String geo({required String lat, required String lng}) =>
+      'geo:${lat.trim()},${lng.trim()}';
+
   /// security: 'WPA' | 'WEP' | 'nopass'
   static String wifi({
     required String ssid,

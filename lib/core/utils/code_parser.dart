@@ -15,6 +15,7 @@ enum CodeType {
 }
 
 extension CodeTypeX on CodeType {
+  /// English label - translate with `context.tr(type.label)` when displaying.
   String get label => switch (this) {
         CodeType.url => 'Website',
         CodeType.wifi => 'Wi-Fi',
@@ -42,7 +43,7 @@ extension CodeTypeX on CodeType {
       };
 }
 
-/// Human friendly barcode format name.
+/// Human friendly barcode format name (English; translate when displaying).
 String prettyFormat(String name) => const {
       'qrCode': 'QR Code',
       'ean13': 'EAN-13',
@@ -92,6 +93,9 @@ class ParsedCode {
 }
 
 /// Turns raw scanned text into a typed, human readable [ParsedCode].
+///
+/// Pass `tr: context.tr` to get field names / button labels in the current
+/// language. The scanned content itself is never translated.
 class CodeParser {
   CodeParser._();
 
@@ -101,7 +105,17 @@ class CodeParser {
   static final RegExp _phoneRe = RegExp(r'^\+?[0-9][0-9\s\-().]{5,19}$');
   static final RegExp _urlRe = RegExp(r'^https?://\S+$', caseSensitive: false);
 
-  static ParsedCode parse(String raw, {String format = 'qrCode'}) {
+  static String _identity(String s) => s;
+
+  /// Translator for the parse currently running (parsing is synchronous).
+  static String Function(String) _t = _identity;
+
+  static ParsedCode parse(
+    String raw, {
+    String format = 'qrCode',
+    String Function(String)? tr,
+  }) {
+    _t = tr ?? _identity;
     final v = raw.trim();
     final lower = v.toLowerCase();
 
@@ -138,10 +152,11 @@ class CodeParser {
       type: CodeType.url,
       raw: v,
       title: v,
-      fields: {'URL': v},
+      fields: {_t('URL'): v},
       actions: [
-        if (uri != null) CodeAction('Open', Icons.open_in_browser, uri: uri),
-        CodeAction('Copy link', Icons.copy, copyText: v),
+        if (uri != null)
+          CodeAction(_t('Open'), Icons.open_in_browser, uri: uri),
+        CodeAction(_t('Copy link'), Icons.copy, copyText: v),
       ],
     );
   }
@@ -151,7 +166,7 @@ class CodeParser {
         raw: v,
         title: v,
         actions: [
-          CodeAction('Search web', Icons.search,
+          CodeAction(_t('Search web'), Icons.search,
               uri: Uri.parse(
                   'https://www.google.com/search?q=${Uri.encodeQueryComponent(v)}')),
         ],
@@ -161,12 +176,12 @@ class CodeParser {
         type: CodeType.product,
         raw: v,
         title: v,
-        fields: {'Barcode': v, 'Format': prettyFormat(format)},
+        fields: {_t('Barcode'): v, _t('Format'): _t(prettyFormat(format))},
         actions: [
-          CodeAction('Search product', Icons.search,
+          CodeAction(_t('Search product'), Icons.search,
               uri: Uri.parse(
                   'https://www.google.com/search?q=${Uri.encodeQueryComponent(v)}')),
-          CodeAction('Copy number', Icons.copy, copyText: v),
+          CodeAction(_t('Copy number'), Icons.copy, copyText: v),
         ],
       );
 
@@ -182,17 +197,20 @@ class CodeParser {
     return ParsedCode(
       type: CodeType.wifi,
       raw: v,
-      title: ssid.isEmpty ? 'Wi-Fi network' : ssid,
+      title: ssid.isEmpty ? _t('Wi-Fi network') : ssid,
       fields: {
-        'Network': ssid,
-        'Security': (sec.isEmpty || sec.toLowerCase() == 'nopass') ? 'Open' : sec,
-        if (pass.isNotEmpty) 'Password': pass,
-        if ((map['H'] ?? '').toLowerCase() == 'true') 'Hidden': 'Yes',
+        _t('Network'): ssid,
+        _t('Security'):
+            (sec.isEmpty || sec.toLowerCase() == 'nopass')
+                ? _t('Open network')
+                : sec,
+        if (pass.isNotEmpty) _t('Password'): pass,
+        if ((map['H'] ?? '').toLowerCase() == 'true') _t('Hidden'): _t('Yes'),
       },
       actions: [
         if (pass.isNotEmpty)
-          CodeAction('Copy password', Icons.key, copyText: pass),
-        CodeAction('Copy name', Icons.wifi, copyText: ssid),
+          CodeAction(_t('Copy password'), Icons.key, copyText: pass),
+        CodeAction(_t('Copy name'), Icons.wifi, copyText: ssid),
       ],
     );
   }
@@ -227,14 +245,14 @@ class CodeParser {
       raw: v,
       title: addr,
       fields: {
-        'To': addr,
-        if (subject.isNotEmpty) 'Subject': subject,
-        if (body.isNotEmpty) 'Message': body,
+        _t('To'): addr,
+        if (subject.isNotEmpty) _t('Subject'): subject,
+        if (body.isNotEmpty) _t('Message'): body,
       },
       actions: [
-        CodeAction('Send email', Icons.email,
+        CodeAction(_t('Send email'), Icons.email,
             uri: Uri.parse('mailto:$addr${query.isEmpty ? '' : '?$query'}')),
-        CodeAction('Copy address', Icons.copy, copyText: addr),
+        CodeAction(_t('Copy address'), Icons.copy, copyText: addr),
       ],
     );
   }
@@ -246,11 +264,11 @@ class CodeParser {
       type: CodeType.phone,
       raw: v,
       title: number,
-      fields: {'Number': number},
+      fields: {_t('Number'): number},
       actions: [
-        CodeAction('Call', Icons.phone, uri: Uri.parse('tel:$dial')),
-        CodeAction('Send SMS', Icons.sms, uri: Uri.parse('sms:$dial')),
-        CodeAction('Copy number', Icons.copy, copyText: number),
+        CodeAction(_t('Call'), Icons.phone, uri: Uri.parse('tel:$dial')),
+        CodeAction(_t('Send SMS'), Icons.sms, uri: Uri.parse('sms:$dial')),
+        CodeAction(_t('Copy number'), Icons.copy, copyText: number),
       ],
     );
   }
@@ -274,14 +292,14 @@ class CodeParser {
       raw: v,
       title: number,
       fields: {
-        'To': number,
-        if (message.isNotEmpty) 'Message': message,
+        _t('To'): number,
+        if (message.isNotEmpty) _t('Message'): message,
       },
       actions: [
-        CodeAction('Send SMS', Icons.sms,
+        CodeAction(_t('Send SMS'), Icons.sms,
             uri: Uri.parse(
                 'sms:$dial${message.isEmpty ? '' : '?body=${Uri.encodeComponent(message)}'}')),
-        CodeAction('Copy number', Icons.copy, copyText: number),
+        CodeAction(_t('Copy number'), Icons.copy, copyText: number),
       ],
     );
   }
@@ -296,29 +314,34 @@ class CodeParser {
       type: CodeType.geo,
       raw: v,
       title: '$lat, $lng',
-      fields: {'Latitude': lat, 'Longitude': lng},
+      fields: {_t('Latitude'): lat, _t('Longitude'): lng},
       actions: [
-        CodeAction('Open in Maps', Icons.map,
+        CodeAction(_t('Open in Maps'), Icons.map,
             uri: Uri.parse(
                 'https://www.google.com/maps/search/?api=1&query=$lat,$lng')),
-        CodeAction('Copy coordinates', Icons.copy, copyText: '$lat, $lng'),
+        CodeAction(_t('Copy coordinates'), Icons.copy, copyText: '$lat, $lng'),
       ],
     );
   }
 
   static ParsedCode _contact(String v) {
     final fields = <String, String>{};
+    // Adds a field; a repeated label gets a number ("Phone 2").
     void put(String label, String value) {
       value = value.trim();
       if (value.isEmpty) return;
-      var key = label;
+      final shown = _t(label);
+      var key = shown;
       var n = 2;
       while (fields.containsKey(key)) {
-        key = '$label $n';
+        key = '$shown $n';
         n++;
       }
       fields[key] = value;
     }
+
+    String? phone;
+    String? email;
 
     if (v.toLowerCase().startsWith('mecard:')) {
       for (final part in _splitEscaped(v.substring(7), ';')) {
@@ -331,8 +354,10 @@ class CodeParser {
             final p = val.split(',');
             put('Name', p.length > 1 ? '${p[1]} ${p[0]}' : val);
           case 'TEL':
+            phone ??= val.trim();
             put('Phone', val);
           case 'EMAIL':
+            email ??= val.trim();
             put('Email', val);
           case 'ORG':
             put('Organization', val);
@@ -346,6 +371,7 @@ class CodeParser {
       }
     } else {
       String? structuredName;
+      var hasName = false;
       for (final line in v.split(RegExp(r'\r?\n'))) {
         final i = line.indexOf(':');
         if (i < 0) continue;
@@ -353,6 +379,7 @@ class CodeParser {
         final val = line.substring(i + 1);
         switch (key) {
           case 'FN':
+            if (val.trim().isNotEmpty) hasName = true;
             put('Name', val);
           case 'N':
             final p = val.split(';');
@@ -360,8 +387,10 @@ class CodeParser {
                 .where((s) => s.isNotEmpty)
                 .join(' ');
           case 'TEL':
+            phone ??= val.trim();
             put('Phone', val);
           case 'EMAIL':
+            email ??= val.trim();
             put('Email', val);
           case 'ORG':
             put('Organization', val.replaceAll(';', ' '));
@@ -376,29 +405,32 @@ class CodeParser {
             put('Note', val);
         }
       }
-      if (!fields.containsKey('Name') && (structuredName ?? '').isNotEmpty) {
+      if (!hasName && (structuredName ?? '').isNotEmpty) {
         final copy = Map<String, String>.from(fields);
         fields
           ..clear()
-          ..['Name'] = structuredName!
+          ..[_t('Name')] = structuredName!
           ..addAll(copy);
       }
     }
 
-    final phone = fields['Phone'];
-    final email = fields['Email'];
+    final name = fields[_t('Name')];
+    final callNumber = phone;
+    final mailAddress = email;
     return ParsedCode(
       type: CodeType.contact,
       raw: v,
-      title: fields['Name'] ?? phone ?? email ?? 'Contact',
+      title: name ?? callNumber ?? mailAddress ?? _t('Contact'),
       fields: fields,
       actions: [
-        if (phone != null)
-          CodeAction('Call', Icons.phone,
-              uri: Uri.parse('tel:${phone.replaceAll(RegExp(r'[\s\-().]'), '')}')),
-        if (email != null)
-          CodeAction('Email', Icons.email, uri: Uri.parse('mailto:$email')),
-        CodeAction('Copy details', Icons.copy,
+        if (callNumber != null)
+          CodeAction(_t('Call'), Icons.phone,
+              uri: Uri.parse(
+                  'tel:${callNumber.replaceAll(RegExp(r'[\s\-().]'), '')}')),
+        if (mailAddress != null)
+          CodeAction(_t('Email'), Icons.email,
+              uri: Uri.parse('mailto:$mailAddress')),
+        CodeAction(_t('Copy details'), Icons.copy,
             copyText:
                 fields.entries.map((e) => '${e.key}: ${e.value}').join('\n')),
       ],
@@ -415,29 +447,29 @@ class CodeParser {
       if (val.isEmpty) continue;
       switch (key) {
         case 'SUMMARY':
-          fields['Title'] = val;
+          fields[_t('Title')] = val;
         case 'DTSTART':
-          fields['Starts'] = _prettyDate(val);
+          fields[_t('Starts')] = _prettyDate(val);
         case 'DTEND':
-          fields['Ends'] = _prettyDate(val);
+          fields[_t('Ends')] = _prettyDate(val);
         case 'LOCATION':
-          fields['Location'] = val;
+          fields[_t('Location')] = val;
         case 'DESCRIPTION':
-          fields['Description'] = val;
+          fields[_t('Description')] = val;
       }
     }
-    final location = fields['Location'];
+    final location = fields[_t('Location')];
     return ParsedCode(
       type: CodeType.calendar,
       raw: v,
-      title: fields['Title'] ?? 'Calendar event',
+      title: fields[_t('Title')] ?? _t('Calendar event'),
       fields: fields,
       actions: [
         if (location != null)
-          CodeAction('Open location', Icons.map,
+          CodeAction(_t('Open location'), Icons.map,
               uri: Uri.parse(
                   'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(location)}')),
-        CodeAction('Copy details', Icons.copy,
+        CodeAction(_t('Copy details'), Icons.copy,
             copyText:
                 fields.entries.map((e) => '${e.key}: ${e.value}').join('\n')),
       ],
