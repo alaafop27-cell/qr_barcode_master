@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../core/config/app_links.dart';
 
 import '../../core/l10n/app_strings.dart';
 import '../../core/services/history_repository.dart';
@@ -120,6 +123,14 @@ class SettingsScreen extends StatelessWidget {
             },
           ),
           const Divider(),
+          if (privacyPolicyUrl.isNotEmpty)
+            ListTile(
+              leading: const Icon(Icons.privacy_tip_outlined),
+              title: Text(context.tr('Privacy policy')),
+              trailing: const Icon(Icons.open_in_new, size: 18),
+              onTap: () => launchUrl(Uri.parse(privacyPolicyUrl),
+                  mode: LaunchMode.externalApplication),
+            ),
           ListTile(
             leading: const Icon(Icons.info_outline),
             title: Text(context.tr('QR & Barcode Master')),

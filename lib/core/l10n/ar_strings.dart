@@ -178,4 +178,19 @@ const Map<String, String> arStrings = {
   'History cleared': 'تم مسح السجل',
   'Version 1.3.0 - works fully offline':
       'الإصدار 1.3.0 - يعمل بالكامل بدون إنترنت',
+
+  // ---- privacy / onboarding
+  'Privacy policy': 'سياسة الخصوصية',
+  'Skip': 'تخطي',
+  'Next': 'التالي',
+  'Get started': 'ابدأ الآن',
+  'Scan anything': 'امسح أي شيء',
+  'QR codes and all common barcodes, live from the camera or from a photo in your gallery.':
+      'أكواد QR وكل أنواع الباركود الشائعة مباشرة من الكاميرا أو من صورة في المعرض.',
+  'Create your own codes': 'أنشئ أكوادك بنفسك',
+  'Make QR codes for links, Wi-Fi, contacts and more, plus Code 128 and EAN barcodes. Save or share them.':
+      'أنشئ أكواد QR للروابط والواي فاي وجهات الاتصال وغيرها، بالإضافة إلى باركود Code 128 وEAN. احفظها أو شاركها.',
+  'Private and offline': 'خاص ويعمل بدون إنترنت',
+  'Everything stays on your device. No account, no tracking, and your history is yours to clear.':
+      'كل شيء يبقى على جهازك. بدون حساب وبدون تتبع، وسجلك تمسحه وقتما تشاء.',
 };

@@ -2,9 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'package:provider/provider.dart';
+
 import '../../core/l10n/app_strings.dart';
+import '../../core/services/settings_controller.dart';
 import '../../core/widgets/app_logo.dart';
 import '../home/home_shell.dart';
+import '../onboarding/onboarding_screen.dart';
 
 /// Short animated intro, then fades into the app.
 class SplashScreen extends StatefulWidget {
@@ -31,10 +35,12 @@ class _SplashScreenState extends State<SplashScreen>
 
   void _goHome() {
     if (!mounted) return;
+    final done = context.read<SettingsController>().onboardingDone;
     Navigator.of(context).pushReplacement(
       PageRouteBuilder<void>(
         transitionDuration: const Duration(milliseconds: 450),
-        pageBuilder: (_, __, ___) => const HomeShell(),
+        pageBuilder: (_, __, ___) =>
+            done ? const HomeShell() : const OnboardingScreen(),
         transitionsBuilder: (_, animation, __, child) =>
             FadeTransition(opacity: animation, child: child),
       ),

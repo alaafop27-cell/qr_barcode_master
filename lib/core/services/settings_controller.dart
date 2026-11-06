@@ -39,6 +39,9 @@ class SettingsController extends ChangeNotifier {
   bool get vibration => _box.get('vibration', defaultValue: true) as bool;
   bool get saveHistory => _box.get('saveHistory', defaultValue: true) as bool;
 
+  bool get onboardingDone => _box.get('onboardingDone', defaultValue: false) as bool;
+  Future<void> setOnboardingDone() => _put('onboardingDone', true);
+
   Future<void> setSeedColor(Color c) => _put('seed', c.value);
   Future<void> setThemeMode(ThemeMode m) => _put('theme', m.index);
   Future<void> setSound(bool v) => _put('sound', v);
