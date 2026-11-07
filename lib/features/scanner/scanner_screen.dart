@@ -283,7 +283,7 @@ class _ScanOverlayPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final side = size.width * 0.7;
+    final side = size.shortestSide * 0.7;
     final rect = Rect.fromCenter(
       center: Offset(size.width / 2, size.height * 0.42),
       width: side,
