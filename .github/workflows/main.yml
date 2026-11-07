@@ -9,10 +9,13 @@ on:
 permissions:
   contents: write
 
+env:
+  KEYSTORE_FILE: android-signing/upload-keystore.enc
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -28,9 +31,11 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: '3.27.4'
+          flutter-version: '3.44.x'
           cache: true
 
+      # The repo only contains lib/ + pubspec.yaml. Generate the android/
+      # project here, then restore our own pubspec and sources untouched.
       - name: Generate Android platform files
         run: |
           mkdir -p "$RUNNER_TEMP/backup"
@@ -41,10 +46,29 @@ jobs:
           cp -r "$RUNNER_TEMP/backup/lib" lib
           cp "$RUNNER_TEMP/backup/pubspec.yaml" pubspec.yaml
 
-      - name: Patch Android project (permissions, minSdk, optional AdMob ID)
+      - name: Patch Android project (SDK 36, versions, signing, icon, name)
         env:
           ADMOB_APP_ID: ${{ vars.ADMOB_APP_ID }}
+          APP_ID: ${{ vars.APP_ID }}
         run: python3 tool/patch_android.py
+
+      # Release signing: only when the encrypted upload keystore exists in the
+      # repo AND the ANDROID_KEYSTORE_PASSWORD secret is set. Otherwise the
+      # build is signed with the debug key (fine for testing, NOT for Google Play).
+      - name: Prepare release signing
+        env:
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KS_PASS" ] && [ -f "$KEYSTORE_FILE" ]; then
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+              -in "$KEYSTORE_FILE" -out android/app/upload-keystore.jks -pass env:KS_PASS
+            printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=upload\nstoreFile=upload-keystore.jks\n' \
+              "$KS_PASS" "$KS_PASS" > android/key.properties
+            echo "SIGNED=true" >> "$GITHUB_ENV"
+            echo "Release signing enabled (upload key)."
+          else
+            echo "::warning::No upload keystore yet -> signed with the DEBUG key. Fine for testing, NOT accepted by Google Play. Run the 'Create upload keystore' workflow once."
+          fi
 
       - name: Install dependencies
         run: flutter pub get
@@ -52,22 +76,67 @@ jobs:
       - name: Analyze code
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
-      - name: Build release APK
+      - name: Build App Bundle (.aab, for Google Play)
         run: |
-          flutter build apk --release \
+          flutter build appbundle --release \
+            --build-number=${{ github.run_number }} \
+            --dart-define=PRIVACY_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/" \
             --dart-define=ADMOB_APP_ID="${{ vars.ADMOB_APP_ID }}" \
             --dart-define=ADMOB_BANNER_ID="${{ vars.ADMOB_BANNER_ID }}" \
             --dart-define=ADMOB_INTERSTITIAL_ID="${{ vars.ADMOB_INTERSTITIAL_ID }}"
 
-      - name: Upload APK artifact
+      - name: Build APK (for installing on a phone)
+        run: |
+          flutter build apk --release \
+            --build-number=${{ github.run_number }} \
+            --dart-define=PRIVACY_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/" \
+            --dart-define=ADMOB_APP_ID="${{ vars.ADMOB_APP_ID }}" \
+            --dart-define=ADMOB_BANNER_ID="${{ vars.ADMOB_BANNER_ID }}" \
+            --dart-define=ADMOB_INTERSTITIAL_ID="${{ vars.ADMOB_INTERSTITIAL_ID }}"
+
+      - name: Verify target SDK and signing
+        run: |
+          AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          AAB=build/app/outputs/bundle/release/app-release.aab
+          "$AAPT2" dump badging "$APK" | grep -E "^package:|sdkVersion|targetSdkVersion" || true
+          TARGET=$("$AAPT2" dump badging "$APK" | sed -n "s/.*targetSdkVersion:'\([0-9]*\)'.*/\1/p" | head -1)
+          if [ "${TARGET:-0}" -lt 36 ]; then
+            echo "::error::targetSdkVersion is '${TARGET:-unknown}'. Google Play needs 36 or higher."
+            exit 1
+          fi
+          echo "targetSdkVersion = $TARGET  (OK)"
+          echo "--- signing certificate of the .aab:"
+          keytool -printcert -jarfile "$AAB" | head -6 || true
+          if [ "$SIGNED" = "true" ]; then
+            keytool -printcert -jarfile "$AAB" | grep -q "CN=QR Barcode Master" \
+              || { echo "::error::The .aab is NOT signed with the upload key."; exit 1; }
+            echo "Signed with the upload key (OK)"
+          fi
+
+      # Informational: Google Play requires 16 KB page-size support.
+      - name: Check 16 KB page-size compatibility
+        continue-on-error: true
+        run: python3 tool/check_16kb.py build/app/outputs/flutter-apk/app-release.apk build/app/outputs/bundle/release/app-release.aab
+
+      - name: Upload App Bundle (.aab)
+        uses: actions/upload-artifact@v4
+        with:
+          name: QR-Barcode-Master-release-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: QR-Barcode-Master-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
 
-      - name: Attach APK to GitHub Release (tags only)
+      - name: Attach files to GitHub Release (tags only)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: build/app/outputs/flutter-apk/app-release.apk
+          files: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/bundle/release/app-release.aab
